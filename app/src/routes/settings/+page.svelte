@@ -107,7 +107,7 @@
 
 		try {
 			// Generate PKCE parameters
-			const { codeVerifier } = apiClient.git.generatePKCE();
+			const codeVerifier = apiClient.git.generateCodeVerifier();
 			const codeChallenge = await apiClient.git.generateCodeChallenge(codeVerifier);
 
 			// Initiate OAuth flow

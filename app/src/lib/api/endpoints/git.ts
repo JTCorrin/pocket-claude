@@ -139,19 +139,13 @@ export async function checkConnectionStatus(connectionId: string): Promise<GitCo
 }
 
 /**
- * Generate PKCE code verifier and challenge
+ * Generate PKCE code verifier
  */
-export function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+export function generateCodeVerifier(): string {
 	// Generate random code verifier (43-128 chars)
 	const array = new Uint8Array(32);
 	crypto.getRandomValues(array);
-	const codeVerifier = base64URLEncode(array);
-
-	// We'll compute SHA256 in the calling code since crypto.subtle is async
-	return {
-		codeVerifier,
-		codeChallenge: '' // Will be computed asynchronously
-	};
+	return base64URLEncode(array);
 }
 
 /**
@@ -179,6 +173,6 @@ export const git = {
 	getConnection,
 	deleteConnection,
 	checkConnectionStatus,
-	generatePKCE,
+	generateCodeVerifier,
 	generateCodeChallenge
 };
