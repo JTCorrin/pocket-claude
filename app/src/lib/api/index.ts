@@ -175,6 +175,7 @@ export type { User, CreateUserInput, UpdateUserInput } from './schemas';
 // Endpoint imports
 import { claude } from './endpoints/claude';
 import { tasks } from './endpoints/tasks';
+import { git } from './endpoints/git';
 
 /**
  * Main API client object
@@ -188,11 +189,16 @@ import { tasks } from './endpoints/tasks';
  *
  * // Create an async chat task
  * const task = await apiClient.tasks.createChatTask({ message: 'Hello' });
+ *
+ * // Connect to GitHub
+ * const { codeVerifier, codeChallenge } = apiClient.git.generatePKCE();
+ * const oauth = await apiClient.git.initiateOAuth({ provider: 'github', code_challenge: codeChallenge });
  * ```
  */
 export const apiClient = {
 	claude,
-	tasks
+	tasks,
+	git
 	// Add more endpoint modules here as you create them:
 	// auth,
 	// users,
