@@ -174,6 +174,7 @@ export type { User, CreateUserInput, UpdateUserInput } from './schemas';
 
 // Endpoint imports
 import { example } from './endpoints/example';
+import { claude } from './endpoints/claude';
 
 /**
  * Main API client object
@@ -190,7 +191,8 @@ import { example } from './endpoints/example';
  * ```
  */
 export const apiClient = {
-	example
+	example,
+	claude
 	// Add more endpoint modules here as you create them:
 	// auth,
 	// users,
