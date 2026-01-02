@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
+import asyncio
 
 from app.core.config import get_settings
 from app.core.exceptions import AppException
@@ -17,6 +18,7 @@ from app.core.error_handlers import (
 )
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.api.v1.router import api_router
+from app.services.task_service import cleanup_expired_tasks_periodically, get_task_executor
 
 # Configure logging
 logging.basicConfig(
@@ -67,6 +69,35 @@ def create_application() -> FastAPI:
 
     # Include routers
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+    # Lifecycle management
+    cleanup_task = None
+
+    @app.on_event("startup")
+    async def startup_event():
+        """Start background tasks on application startup."""
+        nonlocal cleanup_task
+        logger.info("Starting background task cleanup")
+        cleanup_task = asyncio.create_task(cleanup_expired_tasks_periodically())
+
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        """Cleanup on application shutdown."""
+        nonlocal cleanup_task
+        logger.info("Shutting down application")
+
+        # Cancel cleanup task
+        if cleanup_task:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                logger.info("Cleanup task cancelled")
+
+        # Shutdown task executor
+        executor = get_task_executor()
+        executor.shutdown()
+        logger.info("Task executor shutdown complete")
 
     # Root endpoint
     @app.get(
