@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.corrindata.guardian',
-  appName: 'Guardian Lone Worker',
+  appId: 'com.ixianprotocol.nearorbit',
+  appName: 'Near Orbit',
   webDir: 'build',
   android: {
     // Required for @capacitor-community/background-geolocation
