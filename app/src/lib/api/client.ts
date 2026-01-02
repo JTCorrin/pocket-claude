@@ -18,18 +18,43 @@ import type { HttpMethod, RequestOptions, CacheOptions, AuthTokens } from './typ
 
 // Storage keys
 const AUTH_TOKEN_KEY = 'api_auth_tokens';
+const API_URL_KEY = 'api_base_url';
 
 /**
- * Get the API base URL from environment
+ * Get the API base URL from localStorage or environment
  */
 export function getApiBaseUrl(): string {
-	// Use import.meta.env for Vite environment variables
+	// First check localStorage for runtime configuration
+	if (typeof localStorage !== 'undefined') {
+		const storedUrl = localStorage.getItem(API_URL_KEY);
+		if (storedUrl) {
+			return storedUrl;
+		}
+	}
+
+	// Fall back to environment variable
 	const baseUrl = import.meta.env.VITE_API_URL;
 	if (!baseUrl) {
-		console.warn('VITE_API_URL is not set. API requests will fail.');
+		console.warn('API URL is not configured. Set it in Settings or via VITE_API_URL environment variable.');
 		return '';
 	}
 	return baseUrl;
+}
+
+/**
+ * Set the API base URL at runtime
+ */
+export function setApiBaseUrl(url: string): void {
+	if (typeof localStorage === 'undefined') return;
+	localStorage.setItem(API_URL_KEY, url);
+}
+
+/**
+ * Clear the stored API base URL (reverts to environment variable)
+ */
+export function clearApiBaseUrl(): void {
+	if (typeof localStorage === 'undefined') return;
+	localStorage.removeItem(API_URL_KEY);
 }
 
 // Token management
@@ -358,7 +383,10 @@ export const api = {
 	clearAuthTokens,
 	isTokenExpired,
 	getAccessToken,
-	// Utilities
+	// API URL management
 	getApiBaseUrl,
+	setApiBaseUrl,
+	clearApiBaseUrl,
+	// Utilities
 	isOnline
 };

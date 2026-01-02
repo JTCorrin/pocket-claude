@@ -20,6 +20,11 @@ class Settings(BaseSettings):
 
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    
+    # Git OAuth Client IDs (optional - required for OAuth to work)
+    GITHUB_CLIENT_ID: str | None = None
+    GITLAB_CLIENT_ID: str | None = None
+    GITEA_CLIENT_ID: str | None = None
 
     class Config:
         env_file = ".env"
