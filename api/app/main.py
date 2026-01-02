@@ -19,6 +19,7 @@ from app.core.error_handlers import (
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.api.v1.router import api_router
 from app.services.task_service import cleanup_expired_tasks_periodically, get_task_executor
+from app.core.database import init_db, close_db
 
 # Configure logging
 logging.basicConfig(
@@ -78,13 +79,18 @@ def create_application() -> FastAPI:
     async def startup_event():
         """Start background tasks on application startup."""
         nonlocal cleanup_task, startup_called
-        
+
         # Prevent multiple cleanup tasks from being created
         if startup_called:
             logger.warning("Startup event called multiple times, skipping duplicate initialization")
             return
-            
+
         startup_called = True
+
+        # Initialize database
+        logger.info("Initializing database")
+        await init_db()
+
         logger.info("Starting background task cleanup")
         cleanup_task = asyncio.create_task(cleanup_expired_tasks_periodically())
 
@@ -106,6 +112,10 @@ def create_application() -> FastAPI:
         executor = get_task_executor()
         executor.shutdown()
         logger.info("Task executor shutdown complete")
+
+        # Close database connections
+        await close_db()
+        logger.info("Database connections closed")
 
     # Root endpoint
     @app.get(

@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     GITLAB_CLIENT_ID: str | None = None
     GITEA_CLIENT_ID: str | None = None
 
+    # Database
+    # NOTE: Default uses a relative path. For production, use an absolute path or
+    # ensure the application is always started from the project root directory.
+    DATABASE_URL: str = "sqlite+aiosqlite:///./pocket_claude.db"
+
+    # Encryption (required for token storage)
+    # Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+    ENCRYPTION_KEY: str | None = None
+
     class Config:
         env_file = ".env"
         case_sensitive = True

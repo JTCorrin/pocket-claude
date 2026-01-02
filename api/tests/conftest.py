@@ -1,6 +1,15 @@
 """
 Pytest configuration and fixtures.
 """
+import os
+
+# Set up test environment variables BEFORE importing app
+if "ENCRYPTION_KEY" not in os.environ:
+    os.environ["ENCRYPTION_KEY"] = "iABnUURQNg-h9QADEqOZxAxuQio8JdwJR-NfZEvmvSM="
+# Use in-memory SQLite for tests
+if "DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+
 import pytest
 from fastapi.testclient import TestClient
 from pathlib import Path

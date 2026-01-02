@@ -66,18 +66,18 @@ class GitController:
             redirect_uri=request.redirect_uri,
         )
 
-    def list_connections(self) -> list[GitConnection]:
+    async def list_connections(self) -> list[GitConnection]:
         """
         List all git connections.
 
         Returns:
             List of git connections
         """
-        connections = self.git_service.list_connections()
+        connections = await self.git_service.list_connections()
         logger.info(f"Listed {len(connections)} git connections")
         return connections
 
-    def get_connection(self, connection_id: str) -> GitConnection:
+    async def get_connection(self, connection_id: str) -> GitConnection:
         """
         Get a specific git connection.
 
@@ -87,16 +87,16 @@ class GitController:
         Returns:
             Git connection
         """
-        return self.git_service.get_connection(connection_id)
+        return await self.git_service.get_connection(connection_id)
 
-    def delete_connection(self, connection_id: str) -> None:
+    async def delete_connection(self, connection_id: str) -> None:
         """
         Delete a git connection.
 
         Args:
             connection_id: Connection identifier
         """
-        self.git_service.delete_connection(connection_id)
+        await self.git_service.delete_connection(connection_id)
         logger.info(f"Deleted git connection: {connection_id}")
 
     async def check_connection_status(
