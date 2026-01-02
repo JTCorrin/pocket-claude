@@ -500,8 +500,6 @@ class TestConcurrency:
     async def test_concurrent_cleanup_and_access(self, task_store):
         """Test that cleanup doesn't interfere with concurrent task access."""
         # Create some completed tasks that will expire
-        from datetime import timedelta
-        
         expired_tasks = []
         for i in range(5):
             task = await task_store.create_task(message=f"Expired {i}")

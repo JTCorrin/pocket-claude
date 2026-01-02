@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { apiClient } from '$lib/api';
+	import { PollingAbortedError } from '$lib/api/endpoints/tasks';
 	import type { Session, ChatResponse } from '$lib/api/endpoints/claude';
 	import ChatMessage from '$lib/components/chat-message.svelte';
 	import SessionSelector from '$lib/components/session-selector.svelte';
@@ -186,7 +187,7 @@
 			console.error('Error sending message:', err);
 
 			// Add error message only if not aborted
-			if (err instanceof Error && err.message !== 'Polling aborted') {
+			if (!(err instanceof PollingAbortedError)) {
 				const errorMessage: Message = {
 					role: 'assistant',
 					content: `Error: ${error}`,

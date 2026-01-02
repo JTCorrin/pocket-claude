@@ -7,6 +7,16 @@ import { z } from 'zod';
 import { api } from '../client';
 
 /**
+ * Custom error for aborted polling operations
+ */
+export class PollingAbortedError extends Error {
+	constructor(message = 'Polling aborted') {
+		super(message);
+		this.name = 'PollingAbortedError';
+	}
+}
+
+/**
  * Task status enum
  */
 export enum TaskStatus {
@@ -122,7 +132,7 @@ export async function pollForCompletion(
 	while (attempts < maxAttempts) {
 		// Check if polling was aborted
 		if (signal?.aborted) {
-			throw new Error('Polling aborted');
+			throw new PollingAbortedError();
 		}
 
 		const task = await getTaskStatus(taskId);
