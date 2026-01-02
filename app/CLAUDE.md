@@ -80,13 +80,6 @@ using runes at module level must be `.svelte.ts`.
 </script>
 ```
 
-**Auth (Firebase JWT):**
-
-```typescript
-import { api } from "$lib/api";
-api.setAuthTokens({ accessToken: token, expiresAt: Date.now() + 3600000 });
-```
-
 ## Testing
 
 Vitest with two test projects configured in `vite.config.ts`:
@@ -103,6 +96,12 @@ src/lib/components/
 ├── Button.svelte
 └── Button.svelte.test.ts
 ```
+
+For adding new components use shadcn-svelte:
+
+`pnpm dlx shadcn-svelte@latest add {the component you need}`
+
+See: https://www.shadcn-svelte.com/docs/components
 
 **Running specific projects:**
 
