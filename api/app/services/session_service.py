@@ -70,6 +70,8 @@ class SessionService:
                                 if last_timestamp is None or timestamp > last_timestamp:
                                     last_timestamp = timestamp
                             except (ValueError, AttributeError):
+                                # Ignore malformed or missing timestamps; we'll fall back
+                                # to the file's modification time if no valid timestamp is found.
                                 pass
 
                         # Collect user messages
