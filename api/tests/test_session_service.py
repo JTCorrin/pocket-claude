@@ -2,7 +2,6 @@
 Tests for SessionService.
 """
 import pytest
-from pathlib import Path
 import json
 from datetime import datetime
 
