@@ -4,7 +4,7 @@ Service for managing Claude Code sessions.
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from app.models.claude_models import SessionInfo
@@ -91,7 +91,7 @@ class SessionService:
 
             # Use file modification time if no timestamp found
             if last_timestamp is None:
-                last_timestamp = datetime.fromtimestamp(session_file.stat().st_mtime)
+                last_timestamp = datetime.fromtimestamp(session_file.stat().st_mtime, tz=timezone.utc)
 
             # Get preview from first user message
             preview = user_messages[0] if user_messages else "No messages"
