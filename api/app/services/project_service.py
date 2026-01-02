@@ -2,7 +2,7 @@
 Service for managing Claude Code projects.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from app.models.claude_models import ProjectInfo
 from app.core.exceptions import AppException
@@ -65,13 +65,13 @@ class ProjectService:
                 # Get last active time from most recent session file
                 last_active = None
                 for session_file in session_files:
-                    file_time = datetime.fromtimestamp(session_file.stat().st_mtime)
+                    file_time = datetime.fromtimestamp(session_file.stat().st_mtime, tz=timezone.utc)
                     if last_active is None or file_time > last_active:
                         last_active = file_time
 
                 # Use directory modification time if no sessions
                 if last_active is None:
-                    last_active = datetime.fromtimestamp(project_dir.stat().st_mtime)
+                    last_active = datetime.fromtimestamp(project_dir.stat().st_mtime, tz=timezone.utc)
 
                 projects.append(
                     ProjectInfo(
