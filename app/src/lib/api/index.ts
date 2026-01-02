@@ -93,7 +93,10 @@ export {
 	api,
 	apiRequest,
 	apiRequestWithValidation,
+	// API URL management
 	getApiBaseUrl,
+	setApiBaseUrl,
+	clearApiBaseUrl,
 	// Token management
 	getAuthTokens,
 	setAuthTokens,

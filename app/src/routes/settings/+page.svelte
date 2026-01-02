@@ -2,13 +2,18 @@
 	import { onMount } from 'svelte';
 	import { Browser } from '@capacitor/browser';
 	import { App } from '@capacitor/app';
-	import { apiClient } from '$lib/api';
+	import { apiClient, getApiBaseUrl, setApiBaseUrl, clearApiBaseUrl } from '$lib/api';
 	import type { GitConnection } from '$lib/api/endpoints/git';
 	import { GitProvider } from '$lib/api/endpoints/git';
 
 	let connections = $state<GitConnection[]>([]);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
+	let successMessage = $state<string | null>(null);
+
+	// API URL configuration
+	let apiUrl = $state<string>('');
+	let editingApiUrl = $state(false);
 
 	// OAuth state storage
 	let oauthState = $state<{
@@ -21,9 +26,59 @@
 	const REDIRECT_URI = 'pocketclaude://oauth-callback';
 
 	onMount(async () => {
+		// Load current API URL
+		apiUrl = getApiBaseUrl() || '';
+
 		await loadConnections();
 		setupDeepLinkListener();
 	});
+
+	function saveApiUrl() {
+		try {
+			// Validate URL
+			const url = apiUrl.trim();
+			if (!url) {
+				error = 'API URL cannot be empty';
+				return;
+			}
+
+			// Basic URL validation
+			try {
+				new URL(url);
+			} catch {
+				error = 'Invalid URL format. Use format: http://localhost:8000 or https://api.example.com';
+				return;
+			}
+
+			// Remove trailing slash
+			const cleanUrl = url.replace(/\/$/, '');
+
+			setApiBaseUrl(cleanUrl);
+			apiUrl = cleanUrl;
+			editingApiUrl = false;
+			successMessage = 'API URL saved successfully';
+			error = null;
+
+			// Clear success message after 3 seconds
+			setTimeout(() => {
+				successMessage = null;
+			}, 3000);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to save API URL';
+		}
+	}
+
+	function resetApiUrl() {
+		clearApiBaseUrl();
+		apiUrl = getApiBaseUrl() || '';
+		editingApiUrl = false;
+		successMessage = 'API URL reset to default';
+		error = null;
+
+		setTimeout(() => {
+			successMessage = null;
+		}, 3000);
+	}
 
 	async function loadConnections() {
 		loading = true;
@@ -184,7 +239,7 @@
 <div class="settings-page">
 	<header>
 		<h1>Settings</h1>
-		<p class="subtitle">Connect your git repositories</p>
+		<p class="subtitle">Configure your Pocket Claude instance</p>
 	</header>
 
 	{#if error}
@@ -194,6 +249,53 @@
 			<button onclick={() => (error = null)}>×</button>
 		</div>
 	{/if}
+
+	{#if successMessage}
+		<div class="success-banner">
+			<span>✓</span>
+			<span>{successMessage}</span>
+			<button onclick={() => (successMessage = null)}>×</button>
+		</div>
+	{/if}
+
+	<section class="api-config-section">
+		<h2>API Configuration</h2>
+		<p class="section-description">
+			Configure the backend API URL for your Pocket Claude server
+		</p>
+
+		<div class="api-url-form">
+			{#if editingApiUrl}
+				<div class="form-group">
+					<label for="api-url">API Base URL</label>
+					<input
+						type="url"
+						id="api-url"
+						bind:value={apiUrl}
+						placeholder="https://api.example.com or http://localhost:8000"
+						class="api-url-input"
+					/>
+					<p class="help-text">
+						Enter the full URL of your backend API (without trailing slash)
+					</p>
+				</div>
+
+				<div class="button-group">
+					<button class="btn-primary" onclick={saveApiUrl}>Save</button>
+					<button class="btn-secondary" onclick={() => (editingApiUrl = false)}>Cancel</button>
+					<button class="btn-danger" onclick={resetApiUrl}>Reset to Default</button>
+				</div>
+			{:else}
+				<div class="api-url-display">
+					<div class="url-info">
+						<span class="label">Current API URL:</span>
+						<code class="url-value">{apiUrl || 'Not configured'}</code>
+					</div>
+					<button class="btn-secondary" onclick={() => (editingApiUrl = true)}>Edit</button>
+				</div>
+			{/if}
+		</div>
+	</section>
 
 	<section class="connections-section">
 		<h2>Git Connections</h2>
@@ -315,11 +417,140 @@
 		color: #c00;
 	}
 
+	.success-banner {
+		background: #d4edda;
+		border: 1px solid #c3e6cb;
+		border-radius: 8px;
+		padding: 1rem;
+		margin-bottom: 1.5rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		color: #155724;
+	}
+
+	.success-banner button {
+		margin-left: auto;
+		background: none;
+		border: none;
+		font-size: 1.5rem;
+		cursor: pointer;
+		color: #155724;
+	}
+
+	.api-config-section,
 	.connections-section {
 		background: white;
 		border-radius: 12px;
 		padding: 1.5rem;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		margin-bottom: 1.5rem;
+	}
+
+	.section-description {
+		color: #666;
+		font-size: 0.875rem;
+		margin-bottom: 1rem;
+	}
+
+	.api-url-form {
+		margin-top: 1rem;
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	label {
+		font-weight: 600;
+		font-size: 0.875rem;
+		color: #333;
+	}
+
+	.api-url-input {
+		padding: 0.75rem;
+		border: 1px solid #e0e0e0;
+		border-radius: 6px;
+		font-size: 0.875rem;
+		font-family: 'Monaco', 'Menlo', monospace;
+	}
+
+	.api-url-input:focus {
+		outline: none;
+		border-color: #007bff;
+		box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+	}
+
+	.help-text {
+		font-size: 0.75rem;
+		color: #999;
+	}
+
+	.button-group {
+		display: flex;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.btn-primary {
+		background: #007bff;
+		color: white;
+		border: none;
+		padding: 0.5rem 1.5rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 500;
+	}
+
+	.btn-primary:hover {
+		background: #0056b3;
+	}
+
+	.btn-secondary {
+		background: #6c757d;
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 500;
+	}
+
+	.btn-secondary:hover {
+		background: #545b62;
+	}
+
+	.api-url-display {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1rem;
+		background: #f8f9fa;
+		border-radius: 6px;
+	}
+
+	.url-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.url-info .label {
+		font-size: 0.75rem;
+		color: #666;
+		font-weight: 600;
+	}
+
+	.url-value {
+		font-family: 'Monaco', 'Menlo', monospace;
+		font-size: 0.875rem;
+		background: white;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		border: 1px solid #e0e0e0;
 	}
 
 	h2 {
