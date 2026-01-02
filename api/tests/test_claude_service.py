@@ -126,6 +126,42 @@ class TestClaudeService:
         with pytest.raises(BadRequestException, match="Message cannot be empty"):
             service.execute_chat(message="")
 
+    def test_validate_message_with_null_bytes(self):
+        """Test that messages with null bytes are rejected."""
+        service = ClaudeService()
+        with pytest.raises(BadRequestException, match="invalid null bytes"):
+            service.execute_chat(message="Test\x00message")
+
+    def test_validate_message_too_long(self):
+        """Test that excessively long messages are rejected."""
+        service = ClaudeService()
+        long_message = "a" * (ClaudeService.MAX_MESSAGE_LENGTH + 1)
+        with pytest.raises(BadRequestException, match="exceeds maximum length"):
+            service.execute_chat(message=long_message)
+
+    def test_validate_message_with_control_characters(self):
+        """Test that messages with invalid control characters are rejected."""
+        service = ClaudeService()
+        # Test with a control character (ASCII 1)
+        with pytest.raises(BadRequestException, match="invalid control character"):
+            service.execute_chat(message="Test\x01message")
+
+    def test_validate_message_with_allowed_whitespace(self):
+        """Test that messages with allowed whitespace pass validation."""
+        service = ClaudeService()
+        # This should not raise an exception during validation
+        # We'll test it with a mock to avoid actually running the command
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0,
+                stdout="Response",
+                stderr="",
+            )
+            # Message with tabs, newlines, and carriage returns should be allowed
+            service.execute_chat(message="Test\tmessage\nwith\rwhitespace")
+            # If we get here without an exception, validation passed
+            assert mock_run.called
+
     @patch("os.path.exists")
     def test_execute_chat_invalid_project_path(self, mock_exists):
         """Test executing chat with non-existent project path."""

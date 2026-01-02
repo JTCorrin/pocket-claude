@@ -14,7 +14,7 @@ from app.models.claude_models import (
 from app.services.claude_service import ClaudeService
 from app.services.session_service import SessionService
 from app.services.project_service import ProjectService
-from app.core.exceptions import AppException, BadRequestException
+from app.core.exceptions import BadRequestException
 
 logger = logging.getLogger(__name__)
 
@@ -43,25 +43,16 @@ class ClaudeController:
 
         Raises:
             BadRequestException: If parameters are invalid
-            AppException: If unable to list sessions
+            FileSystemException: If unable to read session files
         """
-        try:
-            # Validate parameters
-            if limit < 1 or limit > 100:
-                raise BadRequestException("Limit must be between 1 and 100")
+        # Validate parameters
+        if limit < 1 or limit > 100:
+            raise BadRequestException("Limit must be between 1 and 100")
 
-            sessions = self.session_service.list_sessions(limit=limit, project=project)
+        sessions = self.session_service.list_sessions(limit=limit, project=project)
 
-            logger.info(f"Listed {len(sessions)} sessions")
-            return SessionsResponse(sessions=sessions)
-
-        except BadRequestException:
-            raise
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error in list_sessions controller: {str(e)}", exc_info=True)
-            raise AppException(f"Unexpected error listing sessions: {str(e)}")
+        logger.info(f"Listed {len(sessions)} sessions")
+        return SessionsResponse(sessions=sessions)
 
     async def chat(self, request: ChatRequest) -> ChatResponse:
         """
@@ -75,37 +66,29 @@ class ClaudeController:
 
         Raises:
             BadRequestException: If request is invalid
-            AppException: If chat execution fails
+            CLINotFoundException: If Claude CLI is not found
+            CommandTimeoutException: If command execution times out
         """
-        try:
-            # Execute chat command
-            response, session_id, exit_code, stderr = (
-                self.claude_service.execute_chat(
-                    message=request.message,
-                    session_id=request.session_id,
-                    project_path=request.project_path,
-                    dangerously_skip_permissions=request.dangerously_skip_permissions,
-                )
+        # Execute chat command
+        response, session_id, exit_code, stderr = (
+            self.claude_service.execute_chat(
+                message=request.message,
+                session_id=request.session_id,
+                project_path=request.project_path,
+                dangerously_skip_permissions=request.dangerously_skip_permissions,
             )
+        )
 
-            logger.info(
-                f"Chat executed successfully. Session: {session_id}, Exit code: {exit_code}"
-            )
+        logger.info(
+            f"Chat executed successfully. Session: {session_id}, Exit code: {exit_code}"
+        )
 
-            return ChatResponse(
-                response=response,
-                session_id=session_id,
-                exit_code=exit_code,
-                stderr=stderr,
-            )
-
-        except BadRequestException:
-            raise
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error in chat controller: {str(e)}", exc_info=True)
-            raise AppException(f"Unexpected error in chat: {str(e)}")
+        return ChatResponse(
+            response=response,
+            session_id=session_id,
+            exit_code=exit_code,
+            stderr=stderr,
+        )
 
     async def health_check(self) -> HealthResponse:
         """
@@ -115,25 +98,19 @@ class ClaudeController:
             HealthResponse with Claude CLI status
 
         Raises:
-            AppException: If health check fails
+            CLINotFoundException: If Claude CLI is not found
+            CommandTimeoutException: If health check times out
         """
-        try:
-            version = self.claude_service.get_version()
-            api_key_configured = self.claude_service.check_api_key()
+        version = self.claude_service.get_version()
+        api_key_configured = self.claude_service.check_api_key()
 
-            logger.debug("Health check successful")
+        logger.debug("Health check successful")
 
-            return HealthResponse(
-                status="ok",
-                claude_version=version,
-                api_key_configured=api_key_configured,
-            )
-
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error in health_check controller: {str(e)}", exc_info=True)
-            raise AppException(f"Unexpected error in health check: {str(e)}")
+        return HealthResponse(
+            status="ok",
+            claude_version=version,
+            api_key_configured=api_key_configured,
+        )
 
     async def list_projects(self) -> ProjectsResponse:
         """
@@ -143,16 +120,9 @@ class ClaudeController:
             ProjectsResponse with list of projects
 
         Raises:
-            AppException: If unable to list projects
+            FileSystemException: If unable to read project directories
         """
-        try:
-            projects = self.project_service.list_projects()
+        projects = self.project_service.list_projects()
 
-            logger.info(f"Listed {len(projects)} projects")
-            return ProjectsResponse(projects=projects)
-
-        except AppException:
-            raise
-        except Exception as e:
-            logger.error(f"Error in list_projects controller: {str(e)}", exc_info=True)
-            raise AppException(f"Unexpected error listing projects: {str(e)}")
+        logger.info(f"Listed {len(projects)} projects")
+        return ProjectsResponse(projects=projects)

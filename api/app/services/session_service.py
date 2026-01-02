@@ -4,11 +4,15 @@ Service for managing Claude Code sessions.
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from app.models.claude_models import SessionInfo
-from app.core.exceptions import NotFoundException, AppException
+from app.core.exceptions import (
+    NotFoundException,
+    AppException,
+    FileSystemException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,8 @@ class SessionService:
                                 if last_timestamp is None or timestamp > last_timestamp:
                                     last_timestamp = timestamp
                             except (ValueError, AttributeError):
+                                # Ignore malformed or missing timestamps; we'll fall back
+                                # to the file's modification time if no valid timestamp is found.
                                 pass
 
                         # Collect user messages
@@ -85,7 +91,7 @@ class SessionService:
 
             # Use file modification time if no timestamp found
             if last_timestamp is None:
-                last_timestamp = datetime.fromtimestamp(session_file.stat().st_mtime)
+                last_timestamp = datetime.fromtimestamp(session_file.stat().st_mtime, tz=timezone.utc)
 
             # Get preview from first user message
             preview = user_messages[0] if user_messages else "No messages"
@@ -153,8 +159,8 @@ class SessionService:
             return sessions[:limit]
 
         except Exception as e:
-            logger.error(f"Error listing sessions: {str(e)}")
-            raise AppException(f"Error listing sessions: {str(e)}")
+            logger.error(f"Error listing sessions: {str(e)}", exc_info=True)
+            raise FileSystemException(f"Error listing sessions: {str(e)}")
 
     def get_session(self, session_id: str) -> SessionInfo:
         """
@@ -190,5 +196,5 @@ class SessionService:
         except NotFoundException:
             raise
         except Exception as e:
-            logger.error(f"Error getting session {session_id}: {str(e)}")
-            raise AppException(f"Error getting session: {str(e)}")
+            logger.error(f"Error getting session {session_id}: {str(e)}", exc_info=True)
+            raise FileSystemException(f"Error getting session: {str(e)}")

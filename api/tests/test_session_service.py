@@ -2,12 +2,10 @@
 Tests for SessionService.
 """
 import pytest
-from pathlib import Path
 import json
-from datetime import datetime
 
 from app.services.session_service import SessionService
-from app.core.exceptions import NotFoundException, AppException
+from app.core.exceptions import NotFoundException
 
 
 class TestSessionService:
@@ -111,7 +109,7 @@ class TestSessionService:
 
         # Older session
         session1_file = project_dir / "session-old.jsonl"
-        with open(session1_file, "w") as f:
+        with open(session1_file, "w", encoding="utf-8") as f:
             msg = {
                 "type": "user",
                 "message": {"content": "Old message"},
@@ -121,7 +119,7 @@ class TestSessionService:
 
         # Newer session
         session2_file = project_dir / "session-new.jsonl"
-        with open(session2_file, "w") as f:
+        with open(session2_file, "w", encoding="utf-8") as f:
             msg = {
                 "type": "user",
                 "message": {"content": "New message"},
@@ -166,7 +164,7 @@ class TestSessionService:
         # Create session with very long message
         session_file = project_dir / "test-session.jsonl"
         long_message = "A" * 200  # 200 character message
-        with open(session_file, "w") as f:
+        with open(session_file, "w", encoding="utf-8") as f:
             msg = {
                 "type": "user",
                 "message": {"content": long_message},
@@ -187,7 +185,7 @@ class TestSessionService:
         project_dir.mkdir(exist_ok=True)
 
         session_file = project_dir / "test-session.jsonl"
-        with open(session_file, "w") as f:
+        with open(session_file, "w", encoding="utf-8") as f:
             # Write non-user entry
             msg = {"type": "other", "data": "test"}
             f.write(json.dumps(msg) + "\n")

@@ -6,13 +6,21 @@ import logging
 import os
 import re
 from typing import Optional, Tuple
-from app.core.exceptions import BadRequestException, AppException
+from app.core.exceptions import (
+    BadRequestException,
+    AppException,
+    CLINotFoundException,
+    CommandTimeoutException,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class ClaudeService:
     """Service for executing Claude Code CLI commands."""
+
+    # Maximum message length to prevent abuse
+    MAX_MESSAGE_LENGTH = 100000  # 100KB of text
 
     def __init__(self):
         """Initialize the Claude service."""
@@ -47,11 +55,11 @@ class ClaudeService:
                 raise AppException("Unable to determine Claude version")
 
         except FileNotFoundError:
-            raise AppException("Claude CLI not found. Please ensure it is installed.")
+            raise CLINotFoundException()
         except subprocess.TimeoutExpired:
-            raise AppException("Claude version check timed out")
+            raise CommandTimeoutException("Claude version check timed out")
         except Exception as e:
-            logger.error(f"Error getting Claude version: {str(e)}")
+            logger.error(f"Error getting Claude version: {str(e)}", exc_info=True)
             raise AppException(f"Error checking Claude version: {str(e)}")
 
     def check_api_key(self) -> bool:
@@ -62,6 +70,40 @@ class ClaudeService:
             True if API key is set, False otherwise
         """
         return bool(os.getenv("ANTHROPIC_API_KEY"))
+
+    def _validate_message(self, message: str) -> None:
+        """
+        Validate and sanitize the message input.
+
+        Args:
+            message: The message to validate
+
+        Raises:
+            BadRequestException: If the message is invalid
+        """
+        if not message or not message.strip():
+            raise BadRequestException("Message cannot be empty")
+
+        # Check for null bytes which can cause issues
+        if "\x00" in message:
+            raise BadRequestException("Message contains invalid null bytes")
+
+        # Check message length to prevent abuse
+        if len(message) > self.MAX_MESSAGE_LENGTH:
+            raise BadRequestException(
+                f"Message exceeds maximum length of {self.MAX_MESSAGE_LENGTH} characters"
+            )
+
+        # Check for other control characters that could be problematic
+        # Allow common whitespace: tab (\t=9), newline (\n=10), carriage return (\r=13)
+        # Space (ASCII 32) and above are automatically allowed by the < 32 check
+        allowed_control_chars = {ord('\t'), ord('\n'), ord('\r')}
+        for char in message:
+            char_code = ord(char)
+            if char_code < 32 and char_code not in allowed_control_chars:
+                raise BadRequestException(
+                    f"Message contains invalid control character: {repr(char)}"
+                )
 
     def execute_chat(
         self,
@@ -86,9 +128,8 @@ class ClaudeService:
             BadRequestException: If inputs are invalid
             AppException: If execution fails
         """
-        # Validate inputs
-        if not message or not message.strip():
-            raise BadRequestException("Message cannot be empty")
+        # Validate and sanitize message input
+        self._validate_message(message)
 
         if project_path:
             # Basic path validation to prevent path traversal
@@ -143,11 +184,11 @@ class ClaudeService:
 
         except subprocess.TimeoutExpired:
             logger.error(f"Claude command timed out after {self.timeout} seconds")
-            raise AppException(
+            raise CommandTimeoutException(
                 f"Claude command timed out after {self.timeout} seconds"
             )
         except FileNotFoundError:
-            raise AppException("Claude CLI not found. Please ensure it is installed.")
+            raise CLINotFoundException()
         except Exception as e:
-            logger.error(f"Error executing Claude command: {str(e)}")
+            logger.error(f"Error executing Claude command: {str(e)}", exc_info=True)
             raise AppException(f"Error executing Claude command: {str(e)}")
