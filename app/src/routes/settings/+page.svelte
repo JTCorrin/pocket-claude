@@ -416,9 +416,9 @@
 	
 	<!-- Delete confirmation modal -->
 	{#if showDeleteConfirm}
-		<div class="modal-overlay" onclick={cancelDelete}>
-			<div class="modal" onclick={(e) => e.stopPropagation()}>
-				<h3>Confirm Deletion</h3>
+		<div class="modal-overlay" role="presentation" onclick={cancelDelete} onkeydown={(e) => e.key === 'Escape' && cancelDelete()}>
+			<div class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-heading" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+				<h3 id="delete-confirm-heading">Confirm Deletion</h3>
 				<p>Are you sure you want to disconnect this git provider?</p>
 				<div class="modal-actions">
 					<button class="btn-secondary" onclick={cancelDelete}>Cancel</button>
@@ -430,9 +430,9 @@
 	
 	<!-- Instance URL input modal -->
 	{#if showInstanceUrlInput}
-		<div class="modal-overlay" onclick={cancelInstanceUrl}>
-			<div class="modal" onclick={(e) => e.stopPropagation()}>
-				<h3>Enter Instance URL</h3>
+		<div class="modal-overlay" role="presentation" onclick={cancelInstanceUrl} onkeydown={(e) => e.key === 'Escape' && cancelInstanceUrl()}>
+			<div class="modal" role="dialog" aria-modal="true" aria-labelledby="instance-url-heading" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+				<h3 id="instance-url-heading">Enter Instance URL</h3>
 				<p>
 					{#if instanceUrlProvider === GitProvider.GITLAB}
 						Enter your GitLab instance URL (e.g., https://gitlab.com):
