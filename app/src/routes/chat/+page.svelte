@@ -82,25 +82,63 @@
 		error = null;
 
 		try {
-			const result: ChatResponse = await apiClient.claude.chat({
+			// Create async task
+			const taskResponse = await apiClient.tasks.createChatTask({
 				message: messageText,
 				session_id: selectedSession?.session_id,
 				dangerously_skip_permissions: true // Enable for automated testing
 			});
 
-			// Add assistant response
-			const assistantMessage: Message = {
+			// Add status message
+			const statusMessage: Message = {
 				role: 'assistant',
-				content: result.response,
+				content: `Processing your request...`,
 				timestamp: new Date()
 			};
+			messages = [...messages, statusMessage];
+			scrollToBottom();
 
-			messages = [...messages, assistantMessage];
+			// Poll for completion
+			const completedTask = await apiClient.tasks.pollForCompletion(taskResponse.task_id, {
+				intervalMs: 2000,
+				onProgress: (task) => {
+					// Update status message based on task status
+					const statusText =
+						task.status === 'running'
+							? 'Claude is thinking...'
+							: task.status === 'pending'
+								? 'Waiting to start...'
+								: 'Processing...';
 
-			// Update selected session ID if this was a new chat
-			if (!selectedSession && result.session_id) {
-				// Optionally reload sessions to show the new session
-				await loadSessions();
+					// Update the status message
+					messages = [
+						...messages.slice(0, -1),
+						{
+							role: 'assistant',
+							content: statusText,
+							timestamp: new Date()
+						}
+					];
+				}
+			});
+
+			// Remove status message and add actual response
+			messages = messages.slice(0, -1);
+
+			if (completedTask.status === 'completed' && completedTask.result) {
+				const assistantMessage: Message = {
+					role: 'assistant',
+					content: completedTask.result,
+					timestamp: new Date()
+				};
+				messages = [...messages, assistantMessage];
+
+				// Update selected session ID if this was a new chat
+				if (!selectedSession && completedTask.session_id) {
+					await loadSessions();
+				}
+			} else if (completedTask.status === 'failed') {
+				throw new Error(completedTask.error || 'Task failed');
 			}
 
 			scrollToBottom();
