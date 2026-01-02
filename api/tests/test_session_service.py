@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 from app.services.session_service import SessionService
-from app.core.exceptions import NotFoundException, AppException
+from app.core.exceptions import NotFoundException
 
 
 class TestSessionService:
