@@ -96,6 +96,7 @@ export async function listTasks(): Promise<TaskInfo[]> {
  * @param taskId - Task ID to poll
  * @param options - Polling options
  * @returns Promise that resolves when task completes
+ * @throws Error if polling is aborted or times out
  */
 export async function pollForCompletion(
 	taskId: string,
@@ -103,13 +104,19 @@ export async function pollForCompletion(
 		intervalMs?: number;
 		maxAttempts?: number;
 		onProgress?: (task: TaskInfo) => void;
+		signal?: AbortSignal;
 	} = {}
 ): Promise<TaskInfo> {
-	const { intervalMs = 2000, maxAttempts = 150, onProgress } = options; // 5 minutes max
+	const { intervalMs = 2000, maxAttempts = 150, onProgress, signal } = options; // ~5 minutes of polling intervals (does not include request time)
 
 	let attempts = 0;
 
 	while (attempts < maxAttempts) {
+		// Check if polling was aborted
+		if (signal?.aborted) {
+			throw new Error('Polling aborted');
+		}
+
 		const task = await getTaskStatus(taskId);
 
 		// Call progress callback if provided

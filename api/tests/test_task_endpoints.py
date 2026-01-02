@@ -4,13 +4,12 @@ Tests for async task endpoints.
 import pytest
 import asyncio
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models.task_models import TaskStatus, TaskInfo
-from app.services.task_service import TaskStore, TaskExecutor, get_task_store
-import app.services.task_service as task_service_module
+from app.models.task_models import TaskStatus
+from app.services.task_service import TaskExecutor, get_task_store
 
 
 @pytest.fixture
@@ -302,7 +301,7 @@ class TestTaskStore:
     async def test_cleanup_preserves_active_tasks(self, task_store):
         """Test that cleanup doesn't remove active tasks."""
         # Create pending and running tasks
-        pending_task = await task_store.create_task(message="Pending")
+        await task_store.create_task(message="Pending")
         running_task = await task_store.create_task(message="Running")
         await task_store.update_task(running_task.task_id, status=TaskStatus.RUNNING)
 

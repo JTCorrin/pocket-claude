@@ -4,7 +4,6 @@ Handles HTTP requests for task status and results.
 """
 import logging
 import asyncio
-from typing import Optional
 
 from app.models.task_models import TaskInfo, TaskResponse
 from app.models.claude_models import ChatRequest
@@ -21,6 +20,7 @@ class TaskController:
         """Initialize controller with service dependencies."""
         self.task_store = get_task_store()
         self.task_executor = get_task_executor()
+        self._background_tasks: set[asyncio.Task] = set()
 
     async def create_chat_task(self, request: ChatRequest) -> TaskResponse:
         """
@@ -43,12 +43,16 @@ class TaskController:
                 project_path=request.project_path,
             )
 
-            # Execute task in background (fire and forget)
-            asyncio.create_task(
+            # Execute task in background with proper tracking
+            background_task = asyncio.create_task(
                 self.task_executor.execute_task(
                     task.task_id, request.dangerously_skip_permissions
                 )
             )
+            
+            # Track the task and clean up when done
+            self._background_tasks.add(background_task)
+            background_task.add_done_callback(self._background_tasks.discard)
 
             logger.info(f"Created async chat task {task.task_id}")
 
