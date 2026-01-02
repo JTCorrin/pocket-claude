@@ -450,3 +450,88 @@ class TestIntegration:
         assert list_response.status_code == 200
         tasks = list_response.json()
         assert any(t["task_id"] == task_id for t in tasks)
+
+
+class TestConcurrency:
+    """Test concurrent task operations."""
+
+    @pytest.mark.asyncio
+    async def test_concurrent_task_creation(self, task_store):
+        """Test creating multiple tasks concurrently."""
+        async def create_task(index: int):
+            return await task_store.create_task(message=f"Concurrent task {index}")
+
+        # Create 10 tasks concurrently
+        tasks = await asyncio.gather(*[create_task(i) for i in range(10)])
+        
+        assert len(tasks) == 10
+        assert len(set(t.task_id for t in tasks)) == 10  # All unique IDs
+        
+        # Verify all tasks are in store
+        all_tasks = await task_store.get_all_tasks()
+        assert len(all_tasks) == 10
+
+    @pytest.mark.asyncio
+    async def test_concurrent_task_updates(self, task_store):
+        """Test updating the same task from multiple coroutines."""
+        # Create a task
+        task = await task_store.create_task(message="Concurrent update test")
+        
+        async def update_task(status: TaskStatus, result: str):
+            await asyncio.sleep(0.01)  # Small delay to increase concurrency
+            return await task_store.update_task(
+                task.task_id,
+                status=status,
+                result=result
+            )
+        
+        # Try to update task concurrently (last one wins)
+        updates = await asyncio.gather(
+            update_task(TaskStatus.RUNNING, "Running 1"),
+            update_task(TaskStatus.RUNNING, "Running 2"),
+            update_task(TaskStatus.COMPLETED, "Completed")
+        )
+        
+        # Verify task reached a terminal state
+        final_task = await task_store.get_task(task.task_id)
+        assert final_task.status in (TaskStatus.RUNNING, TaskStatus.COMPLETED)
+
+    @pytest.mark.asyncio
+    async def test_concurrent_cleanup_and_access(self, task_store):
+        """Test that cleanup doesn't interfere with concurrent task access."""
+        # Create some completed tasks that will expire
+        from datetime import timedelta
+        
+        expired_tasks = []
+        for i in range(5):
+            task = await task_store.create_task(message=f"Expired {i}")
+            await task_store.update_task(task.task_id, status=TaskStatus.COMPLETED, result=f"Result {i}")
+            # Manually set to expired
+            task.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+            expired_tasks.append(task)
+        
+        # Create some active tasks
+        active_tasks = []
+        for i in range(5):
+            task = await task_store.create_task(message=f"Active {i}")
+            active_tasks.append(task)
+        
+        # Run cleanup and access tasks concurrently
+        async def access_tasks():
+            for task in active_tasks:
+                await task_store.get_task(task.task_id)
+                await asyncio.sleep(0.01)
+        
+        results = await asyncio.gather(
+            task_store.cleanup_expired(),
+            access_tasks(),
+            access_tasks()
+        )
+        
+        removed_count = results[0]
+        assert removed_count == 5
+        
+        # Verify active tasks still exist
+        all_tasks = await task_store.get_all_tasks()
+        assert len(all_tasks) == 5
+        assert all(t.task_id in [at.task_id for at in active_tasks] for t in all_tasks)

@@ -91,7 +91,7 @@ export async function listTasks(): Promise<TaskInfo[]> {
 }
 
 /**
- * Poll for task completion
+ * Poll for task completion with exponential backoff
  *
  * @param taskId - Task ID to poll
  * @param options - Polling options
@@ -102,14 +102,22 @@ export async function pollForCompletion(
 	taskId: string,
 	options: {
 		intervalMs?: number;
+		maxIntervalMs?: number;
 		maxAttempts?: number;
 		onProgress?: (task: TaskInfo) => void;
 		signal?: AbortSignal;
 	} = {}
 ): Promise<TaskInfo> {
-	const { intervalMs = 2000, maxAttempts = 150, onProgress, signal } = options; // ~5 minutes of polling intervals (does not include request time)
+	const {
+		intervalMs = 2000,
+		maxIntervalMs = 16000,
+		maxAttempts = 150,
+		onProgress,
+		signal
+	} = options; // ~5-10 minutes with exponential backoff (does not include request time)
 
 	let attempts = 0;
+	let currentInterval = intervalMs;
 
 	while (attempts < maxAttempts) {
 		// Check if polling was aborted
@@ -129,8 +137,11 @@ export async function pollForCompletion(
 			return task;
 		}
 
-		// Wait before next poll
-		await new Promise((resolve) => setTimeout(resolve, intervalMs));
+		// Wait before next poll with exponential backoff
+		await new Promise((resolve) => setTimeout(resolve, currentInterval));
+		
+		// Increase interval for next iteration (exponential backoff with cap)
+		currentInterval = Math.min(currentInterval * 1.5, maxIntervalMs);
 		attempts++;
 	}
 
