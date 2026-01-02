@@ -3,7 +3,6 @@ Tests for SessionService.
 """
 import pytest
 import json
-from datetime import datetime
 
 from app.services.session_service import SessionService
 from app.core.exceptions import NotFoundException
