@@ -243,7 +243,11 @@ class TestHealthEndpoint:
 
         response = client.get("/api/v1/health")
 
-        assert response.status_code == 500
+        assert response.status_code == 503  # Service Unavailable
+        assert "error" in response.json()
+        error = response.json()["error"]
+        assert error["type"] == "CLINotFoundException"
+        assert "Claude CLI not found" in error["message"]
 
 
 class TestProjectsEndpoint:

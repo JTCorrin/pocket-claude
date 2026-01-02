@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from app.models.claude_models import ProjectInfo
-from app.core.exceptions import AppException
+from app.core.exceptions import FileSystemException
 
 logger = logging.getLogger(__name__)
 
@@ -87,5 +87,5 @@ class ProjectService:
             return projects
 
         except Exception as e:
-            logger.error(f"Error listing projects: {str(e)}")
-            raise AppException(f"Error listing projects: {str(e)}")
+            logger.error(f"Error listing projects: {str(e)}", exc_info=True)
+            raise FileSystemException(f"Error listing projects: {str(e)}")

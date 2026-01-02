@@ -8,7 +8,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from app.models.claude_models import SessionInfo
-from app.core.exceptions import NotFoundException, AppException
+from app.core.exceptions import (
+    NotFoundException,
+    AppException,
+    FileSystemException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,8 +157,8 @@ class SessionService:
             return sessions[:limit]
 
         except Exception as e:
-            logger.error(f"Error listing sessions: {str(e)}")
-            raise AppException(f"Error listing sessions: {str(e)}")
+            logger.error(f"Error listing sessions: {str(e)}", exc_info=True)
+            raise FileSystemException(f"Error listing sessions: {str(e)}")
 
     def get_session(self, session_id: str) -> SessionInfo:
         """
@@ -190,5 +194,5 @@ class SessionService:
         except NotFoundException:
             raise
         except Exception as e:
-            logger.error(f"Error getting session {session_id}: {str(e)}")
-            raise AppException(f"Error getting session: {str(e)}")
+            logger.error(f"Error getting session {session_id}: {str(e)}", exc_info=True)
+            raise FileSystemException(f"Error getting session: {str(e)}")

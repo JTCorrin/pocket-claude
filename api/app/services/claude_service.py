@@ -6,7 +6,12 @@ import logging
 import os
 import re
 from typing import Optional, Tuple
-from app.core.exceptions import BadRequestException, AppException
+from app.core.exceptions import (
+    BadRequestException,
+    AppException,
+    CLINotFoundException,
+    CommandTimeoutException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +52,11 @@ class ClaudeService:
                 raise AppException("Unable to determine Claude version")
 
         except FileNotFoundError:
-            raise AppException("Claude CLI not found. Please ensure it is installed.")
+            raise CLINotFoundException()
         except subprocess.TimeoutExpired:
-            raise AppException("Claude version check timed out")
+            raise CommandTimeoutException("Claude version check timed out")
         except Exception as e:
-            logger.error(f"Error getting Claude version: {str(e)}")
+            logger.error(f"Error getting Claude version: {str(e)}", exc_info=True)
             raise AppException(f"Error checking Claude version: {str(e)}")
 
     def check_api_key(self) -> bool:
@@ -143,11 +148,11 @@ class ClaudeService:
 
         except subprocess.TimeoutExpired:
             logger.error(f"Claude command timed out after {self.timeout} seconds")
-            raise AppException(
+            raise CommandTimeoutException(
                 f"Claude command timed out after {self.timeout} seconds"
             )
         except FileNotFoundError:
-            raise AppException("Claude CLI not found. Please ensure it is installed.")
+            raise CLINotFoundException()
         except Exception as e:
-            logger.error(f"Error executing Claude command: {str(e)}")
+            logger.error(f"Error executing Claude command: {str(e)}", exc_info=True)
             raise AppException(f"Error executing Claude command: {str(e)}")
