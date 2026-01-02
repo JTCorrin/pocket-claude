@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { apiClient } from '$lib/api';
+	import { PollingAbortedError } from '$lib/api/endpoints/tasks';
 	import type { Session, ChatResponse } from '$lib/api/endpoints/claude';
 	import ChatMessage from '$lib/components/chat-message.svelte';
 	import SessionSelector from '$lib/components/session-selector.svelte';
@@ -23,10 +24,21 @@
 
 	// Refs
 	let messagesEndRef = $state<HTMLDivElement>();
+	
+	// Track active polling operations for cleanup
+	let pollingAbortController: AbortController | null = null;
 
 	// Load sessions on mount
 	onMount(async () => {
 		await loadSessions();
+	});
+	
+	// Cleanup polling on component unmount
+	onDestroy(() => {
+		if (pollingAbortController) {
+			pollingAbortController.abort();
+			pollingAbortController = null;
+		}
 	});
 
 	async function loadSessions() {
@@ -80,43 +92,112 @@
 
 		sendingMessage = true;
 		error = null;
+		
+		// Create new abort controller for this request
+		pollingAbortController = new AbortController();
+		
+		// Track status message index to update the correct message
+		let statusMessageIndex = -1;
 
 		try {
-			const result: ChatResponse = await apiClient.claude.chat({
+			// Create async task
+			const taskResponse = await apiClient.tasks.createChatTask({
 				message: messageText,
 				session_id: selectedSession?.session_id,
-				dangerously_skip_permissions: true // Enable for automated testing
+				dangerously_skip_permissions: false // Keep permissions enabled for user safety
 			});
 
-			// Add assistant response
-			const assistantMessage: Message = {
+			// Add status message
+			const statusMessage: Message = {
 				role: 'assistant',
-				content: result.response,
+				content: `Processing your request...`,
 				timestamp: new Date()
 			};
+			messages = [...messages, statusMessage];
+			statusMessageIndex = messages.length - 1;
+			scrollToBottom();
 
-			messages = [...messages, assistantMessage];
+			// Poll for completion with abort signal
+			const completedTask = await apiClient.tasks.pollForCompletion(taskResponse.task_id, {
+				intervalMs: 2000,
+				signal: pollingAbortController.signal,
+				onProgress: (task) => {
+					// Update status message based on task status
+					const statusText =
+						task.status === 'running'
+							? 'Claude is thinking...'
+							: task.status === 'pending'
+								? 'Waiting to start...'
+								: 'Processing...';
 
-			// Update selected session ID if this was a new chat
-			if (!selectedSession && result.session_id) {
-				// Optionally reload sessions to show the new session
-				await loadSessions();
+					// Update the specific status message
+					if (statusMessageIndex >= 0 && statusMessageIndex < messages.length) {
+						messages = [
+							...messages.slice(0, statusMessageIndex),
+							{
+								role: 'assistant',
+								content: statusText,
+								timestamp: new Date()
+							},
+							...messages.slice(statusMessageIndex + 1)
+						];
+					}
+				}
+			});
+
+			// Remove status message
+			if (statusMessageIndex >= 0) {
+				messages = messages.filter((_, index) => index !== statusMessageIndex);
+			}
+
+			if (completedTask.status === 'completed') {
+				if (completedTask.result) {
+					const assistantMessage: Message = {
+						role: 'assistant',
+						content: completedTask.result,
+						timestamp: new Date()
+					};
+					messages = [...messages, assistantMessage];
+				} else {
+					// Handle edge case where task completed but has no result
+					const assistantMessage: Message = {
+						role: 'assistant',
+						content: 'Task completed but no response was received.',
+						timestamp: new Date()
+					};
+					messages = [...messages, assistantMessage];
+				}
+
+				// Update selected session ID if this was a new chat
+				if (!selectedSession && completedTask.session_id) {
+					await loadSessions();
+				}
+			} else if (completedTask.status === 'failed') {
+				throw new Error(completedTask.error || 'Task failed');
 			}
 
 			scrollToBottom();
 		} catch (err) {
+			// Remove status message on error if it exists
+			if (statusMessageIndex >= 0 && statusMessageIndex < messages.length) {
+				messages = messages.filter((_, index) => index !== statusMessageIndex);
+			}
+			
 			error = err instanceof Error ? err.message : 'Failed to send message';
 			console.error('Error sending message:', err);
 
-			// Add error message
-			const errorMessage: Message = {
-				role: 'assistant',
-				content: `Error: ${error}`,
-				timestamp: new Date()
-			};
-			messages = [...messages, errorMessage];
+			// Add error message only if not aborted
+			if (!(err instanceof PollingAbortedError)) {
+				const errorMessage: Message = {
+					role: 'assistant',
+					content: `Error: ${error}`,
+					timestamp: new Date()
+				};
+				messages = [...messages, errorMessage];
+			}
 		} finally {
 			sendingMessage = false;
+			pollingAbortController = null;
 		}
 	}
 

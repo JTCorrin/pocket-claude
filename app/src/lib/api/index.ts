@@ -173,8 +173,8 @@ export {
 export type { User, CreateUserInput, UpdateUserInput } from './schemas';
 
 // Endpoint imports
-import { example } from './endpoints/example';
 import { claude } from './endpoints/claude';
+import { tasks } from './endpoints/tasks';
 
 /**
  * Main API client object
@@ -183,16 +183,16 @@ import { claude } from './endpoints/claude';
  *
  * @example
  * ```typescript
- * // Get all examples
- * const { data } = await apiClient.example.getAll();
+ * // List Claude sessions
+ * const { sessions } = await apiClient.claude.listSessions();
  *
- * // Create a new example
- * const { data: newItem } = await apiClient.example.create({ name: 'Test' });
+ * // Create an async chat task
+ * const task = await apiClient.tasks.createChatTask({ message: 'Hello' });
  * ```
  */
 export const apiClient = {
-	example,
-	claude
+	claude,
+	tasks
 	// Add more endpoint modules here as you create them:
 	// auth,
 	// users,
