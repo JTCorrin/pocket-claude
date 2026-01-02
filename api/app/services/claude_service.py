@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 class ClaudeService:
     """Service for executing Claude Code CLI commands."""
 
+    # Maximum message length to prevent abuse
+    MAX_MESSAGE_LENGTH = 100000  # 100KB of text
+
     def __init__(self):
         """Initialize the Claude service."""
         self.timeout = 300  # 5 minutes default timeout
@@ -63,6 +66,37 @@ class ClaudeService:
         """
         return bool(os.getenv("ANTHROPIC_API_KEY"))
 
+    def _validate_message(self, message: str) -> None:
+        """
+        Validate and sanitize the message input.
+
+        Args:
+            message: The message to validate
+
+        Raises:
+            BadRequestException: If the message is invalid
+        """
+        if not message or not message.strip():
+            raise BadRequestException("Message cannot be empty")
+
+        # Check for null bytes which can cause issues
+        if "\x00" in message:
+            raise BadRequestException("Message contains invalid null bytes")
+
+        # Check message length to prevent abuse
+        if len(message) > self.MAX_MESSAGE_LENGTH:
+            raise BadRequestException(
+                f"Message exceeds maximum length of {self.MAX_MESSAGE_LENGTH} characters"
+            )
+
+        # Check for other control characters that could be problematic
+        # Allow common whitespace (space, tab, newline, carriage return)
+        for char in message:
+            if ord(char) < 32 and char not in ["\t", "\n", "\r", " "]:
+                raise BadRequestException(
+                    f"Message contains invalid control character: {repr(char)}"
+                )
+
     def execute_chat(
         self,
         message: str,
@@ -86,9 +120,8 @@ class ClaudeService:
             BadRequestException: If inputs are invalid
             AppException: If execution fails
         """
-        # Validate inputs
-        if not message or not message.strip():
-            raise BadRequestException("Message cannot be empty")
+        # Validate and sanitize message input
+        self._validate_message(message)
 
         if project_path:
             # Basic path validation to prevent path traversal
