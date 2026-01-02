@@ -34,13 +34,14 @@ Add to your `.env` file:
 GITHUB_CLIENT_ID=your_client_id_here
 ```
 
-Update `api/app/services/git_service.py`:
+The backend automatically reads this configuration from environment variables. The `GitService` class in `api/app/services/git_service.py` will use the configured client ID when building OAuth authorization URLs.
+
+Example configuration loading (already implemented in `api/app/core/config.py`):
 ```python
-params = {
-    "client_id": settings.GITHUB_CLIENT_ID,  # Add this line
-    "response_type": "code",
-    # ... rest of params
-}
+from app.core.config import get_settings
+
+settings = get_settings()
+client_id = settings.GITHUB_CLIENT_ID
 ```
 
 ### Scopes Required
@@ -80,7 +81,7 @@ Add to your `.env` file:
 GITLAB_CLIENT_ID=your_application_id_here
 ```
 
-Update `api/app/services/git_service.py` to include client_id in GitLab flow.
+The backend automatically reads this configuration and includes it in OAuth flows for GitLab instances.
 
 ### Self-Hosted GitLab
 
@@ -114,7 +115,7 @@ Add to your `.env` file:
 GITEA_CLIENT_ID=your_client_id_here
 ```
 
-Update `api/app/services/git_service.py` to include client_id in Gitea flow.
+The backend automatically reads this configuration and includes it in OAuth flows for Gitea instances.
 
 ### Scopes Available
 
