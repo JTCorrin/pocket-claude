@@ -84,7 +84,7 @@ async def oauth_callback(request: OAuthCallbackRequest) -> GitConnection:
 )
 async def list_connections() -> List[GitConnection]:
     """List all git connections."""
-    return git_controller.list_connections()
+    return await git_controller.list_connections()
 
 
 @router.get(
@@ -96,7 +96,7 @@ async def list_connections() -> List[GitConnection]:
 )
 async def get_connection(connection_id: str) -> GitConnection:
     """Get a specific git connection."""
-    return git_controller.get_connection(connection_id)
+    return await git_controller.get_connection(connection_id)
 
 
 @router.delete(
@@ -107,7 +107,7 @@ async def get_connection(connection_id: str) -> GitConnection:
 )
 async def delete_connection(connection_id: str) -> None:
     """Delete a git connection."""
-    git_controller.delete_connection(connection_id)
+    await git_controller.delete_connection(connection_id)
 
 
 @router.get(
