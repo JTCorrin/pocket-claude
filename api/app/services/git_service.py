@@ -21,6 +21,10 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Constants
+MAX_ERROR_MESSAGE_LENGTH = 200  # Maximum length for error message snippets
+OAUTH_STATE_EXPIRY_MINUTES = 15  # OAuth states expire after 15 minutes
+
 
 class GitProviderConfig:
     """Configuration for git providers."""
@@ -107,20 +111,22 @@ class GitService:
             )
         
         # Basic URL structure validation
-        if not re.match(r'^https://[a-zA-Z0-9\-.]+(:[0-9]+)?(/.*)?$', url):
+        # Pattern: https://hostname(:port)(/path)
+        # Hostname can be domain or IP, but must be well-formed
+        if not re.match(r'^https://[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*(:[0-9]+)?(/.*)?$', url):
             raise BadRequestException(
-                "Invalid instance URL format"
+                "Invalid instance URL format. Must be a valid HTTPS URL."
             )
     
     def _cleanup_expired_oauth_states(self) -> None:
         """
-        Clean up expired OAuth states (older than 15 minutes).
+        Clean up expired OAuth states (older than OAUTH_STATE_EXPIRY_MINUTES).
         
         This prevents the OAuth state dictionary from growing indefinitely
         with abandoned or failed OAuth attempts.
         """
         now = datetime.now(timezone.utc)
-        expiry_time = timedelta(minutes=15)
+        expiry_time = timedelta(minutes=OAUTH_STATE_EXPIRY_MINUTES)
         
         expired_states = [
             state_id
@@ -334,7 +340,7 @@ class GitService:
                 except (ValueError, Exception):
                     # Response is not JSON or parsing failed
                     if token_response.text:
-                        error_details = token_response.text[:200]  # Limit length
+                        error_details = token_response.text[:MAX_ERROR_MESSAGE_LENGTH]  # Limit length
 
                 if error_details:
                     error_message = f"{error_message} - {error_details}"
