@@ -81,7 +81,7 @@ def create_test_session(temp_claude_dir, sample_session_data):
 
         # Create session file
         session_file = project_dir / f"{session_id}.jsonl"
-        with open(session_file, "w") as f:
+        with open(session_file, "w", encoding="utf-8") as f:
             for msg in messages:
                 f.write(json.dumps(msg) + "\n")
 
