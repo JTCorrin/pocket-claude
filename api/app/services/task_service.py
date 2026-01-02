@@ -31,8 +31,14 @@ class TaskStore:
             ttl_hours: Time-to-live for completed tasks in hours
         """
         self._tasks: Dict[str, TaskInfo] = {}
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None
         self.ttl_hours = ttl_hours
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create the async lock in the current event loop."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def create_task(
         self,
@@ -65,7 +71,7 @@ class TaskStore:
             expires_at=now + timedelta(hours=self.ttl_hours),
         )
 
-        async with self._lock:
+        async with self._get_lock():
             self._tasks[task_id] = task
 
         logger.info(f"Created task {task_id}")
@@ -84,7 +90,7 @@ class TaskStore:
         Raises:
             NotFoundException: If task not found
         """
-        async with self._lock:
+        async with self._get_lock():
             task = self._tasks.get(task_id)
 
         if task is None:
@@ -120,7 +126,7 @@ class TaskStore:
         Raises:
             NotFoundException: If task not found
         """
-        async with self._lock:
+        async with self._get_lock():
             task = self._tasks.get(task_id)
             if task is None:
                 raise NotFoundException(f"Task not found: {task_id}")
@@ -146,8 +152,11 @@ class TaskStore:
             if status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
                 task.expires_at = now + timedelta(hours=self.ttl_hours)
 
+            # Create a snapshot of the updated task to return safely
+            task_snapshot = task.model_copy(deep=True)
+
         logger.info(f"Updated task {task_id}: status={status}")
-        return task
+        return task_snapshot
 
     async def cleanup_expired(self) -> int:
         """
@@ -159,7 +168,7 @@ class TaskStore:
         now = datetime.now(timezone.utc)
         removed = 0
 
-        async with self._lock:
+        async with self._get_lock():
             expired_ids = [
                 task_id
                 for task_id, task in self._tasks.items()
@@ -179,7 +188,7 @@ class TaskStore:
 
     async def get_all_tasks(self) -> list[TaskInfo]:
         """Get all tasks (for debugging/admin)."""
-        async with self._lock:
+        async with self._get_lock():
             return list(self._tasks.values())
 
 
@@ -227,7 +236,7 @@ class TaskExecutor:
 
         try:
             # Execute in thread pool (blocking call)
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             response, session_id, exit_code, stderr = await loop.run_in_executor(
                 self._executor,
                 self._claude_service.execute_chat,
@@ -280,9 +289,18 @@ async def cleanup_expired_tasks_periodically():
     """Background task to cleanup expired tasks."""
     task_store = get_task_store()
 
-    while True:
+    try:
+        while True:
+            try:
+                await asyncio.sleep(300)  # Run every 5 minutes
+                await task_store.cleanup_expired()
+            except Exception as e:
+                logger.error(f"Error in cleanup task: {str(e)}", exc_info=True)
+    except asyncio.CancelledError:
+        # Handle graceful shutdown: attempt a final cleanup before propagating cancellation
+        logger.info("cleanup_expired_tasks_periodically task cancelled, performing final cleanup")
         try:
-            await asyncio.sleep(300)  # Run every 5 minutes
             await task_store.cleanup_expired()
         except Exception as e:
-            logger.error(f"Error in cleanup task: {str(e)}", exc_info=True)
+            logger.error(f"Error during final cleanup in cleanup_expired_tasks_periodically: {str(e)}", exc_info=True)
+        raise

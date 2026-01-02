@@ -72,11 +72,19 @@ def create_application() -> FastAPI:
 
     # Lifecycle management
     cleanup_task = None
+    startup_called = False
 
     @app.on_event("startup")
     async def startup_event():
         """Start background tasks on application startup."""
-        nonlocal cleanup_task
+        nonlocal cleanup_task, startup_called
+        
+        # Prevent multiple cleanup tasks from being created
+        if startup_called:
+            logger.warning("Startup event called multiple times, skipping duplicate initialization")
+            return
+            
+        startup_called = True
         logger.info("Starting background task cleanup")
         cleanup_task = asyncio.create_task(cleanup_expired_tasks_periodically())
 

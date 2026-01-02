@@ -7,6 +7,16 @@ import { z } from 'zod';
 import { api } from '../client';
 
 /**
+ * Custom error for aborted polling operations
+ */
+export class PollingAbortedError extends Error {
+	constructor(message = 'Polling aborted') {
+		super(message);
+		this.name = 'PollingAbortedError';
+	}
+}
+
+/**
  * Task status enum
  */
 export enum TaskStatus {
@@ -91,25 +101,40 @@ export async function listTasks(): Promise<TaskInfo[]> {
 }
 
 /**
- * Poll for task completion
+ * Poll for task completion with exponential backoff
  *
  * @param taskId - Task ID to poll
  * @param options - Polling options
  * @returns Promise that resolves when task completes
+ * @throws Error if polling is aborted or times out
  */
 export async function pollForCompletion(
 	taskId: string,
 	options: {
 		intervalMs?: number;
+		maxIntervalMs?: number;
 		maxAttempts?: number;
 		onProgress?: (task: TaskInfo) => void;
+		signal?: AbortSignal;
 	} = {}
 ): Promise<TaskInfo> {
-	const { intervalMs = 2000, maxAttempts = 150, onProgress } = options; // 5 minutes max
+	const {
+		intervalMs = 2000,
+		maxIntervalMs = 16000,
+		maxAttempts = 150,
+		onProgress,
+		signal
+	} = options; // ~5-10 minutes with exponential backoff (does not include request time)
 
 	let attempts = 0;
+	let currentInterval = intervalMs;
 
 	while (attempts < maxAttempts) {
+		// Check if polling was aborted
+		if (signal?.aborted) {
+			throw new PollingAbortedError();
+		}
+
 		const task = await getTaskStatus(taskId);
 
 		// Call progress callback if provided
@@ -122,8 +147,11 @@ export async function pollForCompletion(
 			return task;
 		}
 
-		// Wait before next poll
-		await new Promise((resolve) => setTimeout(resolve, intervalMs));
+		// Wait before next poll with exponential backoff
+		await new Promise((resolve) => setTimeout(resolve, currentInterval));
+		
+		// Increase interval for next iteration (exponential backoff with cap)
+		currentInterval = Math.min(currentInterval * 1.5, maxIntervalMs);
 		attempts++;
 	}
 
