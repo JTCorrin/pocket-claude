@@ -90,9 +90,9 @@ class ClaudeService:
             )
 
         # Check for other control characters that could be problematic
-        # Allow common whitespace (space, tab, newline, carriage return)
+        # Allow common whitespace (tab, newline, carriage return)
         for char in message:
-            if ord(char) < 32 and char not in ["\t", "\n", "\r", " "]:
+            if ord(char) < 32 and char not in ["\t", "\n", "\r"]:
                 raise BadRequestException(
                     f"Message contains invalid control character: {repr(char)}"
                 )
