@@ -90,9 +90,12 @@ class ClaudeService:
             )
 
         # Check for other control characters that could be problematic
-        # Allow common whitespace (tab, newline, carriage return)
+        # Allow common whitespace: tab (\t=9), newline (\n=10), carriage return (\r=13)
+        # Space (ASCII 32) and above are automatically allowed by the < 32 check
+        allowed_control_chars = {ord('\t'), ord('\n'), ord('\r')}
         for char in message:
-            if ord(char) < 32 and char not in ["\t", "\n", "\r"]:
+            char_code = ord(char)
+            if char_code < 32 and char_code not in allowed_control_chars:
                 raise BadRequestException(
                     f"Message contains invalid control character: {repr(char)}"
                 )
