@@ -2,10 +2,10 @@
 Service for managing Claude Code projects.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from app.models.claude_models import ProjectInfo
-from app.core.exceptions import AppException
+from app.core.exceptions import FileSystemException
 from app.utils.path_utils import decode_project_path
 
 logger = logging.getLogger(__name__)
@@ -51,13 +51,13 @@ class ProjectService:
                 # Get last active time from most recent session file
                 last_active = None
                 for session_file in session_files:
-                    file_time = datetime.fromtimestamp(session_file.stat().st_mtime)
+                    file_time = datetime.fromtimestamp(session_file.stat().st_mtime, tz=timezone.utc)
                     if last_active is None or file_time > last_active:
                         last_active = file_time
 
                 # Use directory modification time if no sessions
                 if last_active is None:
-                    last_active = datetime.fromtimestamp(project_dir.stat().st_mtime)
+                    last_active = datetime.fromtimestamp(project_dir.stat().st_mtime, tz=timezone.utc)
 
                 projects.append(
                     ProjectInfo(
@@ -73,5 +73,5 @@ class ProjectService:
             return projects
 
         except Exception as e:
-            logger.error(f"Error listing projects: {str(e)}")
-            raise AppException(f"Error listing projects: {str(e)}")
+            logger.error(f"Error listing projects: {str(e)}", exc_info=True)
+            raise FileSystemException(f"Error listing projects: {str(e)}")

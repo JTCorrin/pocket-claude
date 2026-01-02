@@ -87,7 +87,7 @@ class TestProjectService:
         project1_dir = projects_dir / "-Users-test-project1"
         project1_dir.mkdir()
         session1_file = project1_dir / "session-1.jsonl"
-        with open(session1_file, "w") as f:
+        with open(session1_file, "w", encoding="utf-8") as f:
             f.write(json.dumps({"type": "test"}) + "\n")
 
         # Create newer project
@@ -97,7 +97,7 @@ class TestProjectService:
         project2_dir = projects_dir / "-Users-test-project2"
         project2_dir.mkdir()
         session2_file = project2_dir / "session-2.jsonl"
-        with open(session2_file, "w") as f:
+        with open(session2_file, "w", encoding="utf-8") as f:
             f.write(json.dumps({"type": "test"}) + "\n")
 
         service = ProjectService()
