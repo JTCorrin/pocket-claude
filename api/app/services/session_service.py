@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 from app.models.claude_models import SessionInfo
 from app.core.exceptions import NotFoundException, AppException
+from app.utils.path_utils import decode_project_path
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +21,6 @@ class SessionService:
         """Initialize the session service."""
         self.claude_dir = Path.home() / ".claude"
         self.projects_dir = self.claude_dir / "projects"
-
-    def _decode_project_path(self, folder_name: str) -> str:
-        """
-        Decode a project folder name to its original path.
-
-        Args:
-            folder_name: The encoded folder name
-
-        Returns:
-            The decoded project path
-        """
-        # Remove leading hyphen if present and replace hyphens with slashes
-        if folder_name.startswith("-"):
-            folder_name = folder_name[1:]
-        return "/" + folder_name.replace("-", "/")
 
     def _parse_session_file(self, session_file: Path) -> Optional[SessionInfo]:
         """
@@ -49,7 +35,7 @@ class SessionService:
         try:
             session_id = session_file.stem
             project_folder = session_file.parent.name
-            project_path = self._decode_project_path(project_folder)
+            project_path = decode_project_path(project_folder)
 
             # Read the JSONL file
             user_messages = []
@@ -136,7 +122,7 @@ class SessionService:
                     continue
 
                 # Decode project path
-                project_path = self._decode_project_path(project_dir.name)
+                project_path = decode_project_path(project_dir.name)
 
                 # Filter by project if specified
                 if project and project_path != project:

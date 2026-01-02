@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from app.models.claude_models import ProjectInfo
 from app.core.exceptions import AppException
+from app.utils.path_utils import decode_project_path
 
 logger = logging.getLogger(__name__)
 
@@ -17,21 +18,6 @@ class ProjectService:
         """Initialize the project service."""
         self.claude_dir = Path.home() / ".claude"
         self.projects_dir = self.claude_dir / "projects"
-
-    def _decode_project_path(self, folder_name: str) -> str:
-        """
-        Decode a project folder name to its original path.
-
-        Args:
-            folder_name: The encoded folder name
-
-        Returns:
-            The decoded project path
-        """
-        # Remove leading hyphen if present and replace hyphens with slashes
-        if folder_name.startswith("-"):
-            folder_name = folder_name[1:]
-        return "/" + folder_name.replace("-", "/")
 
     def list_projects(self) -> list[ProjectInfo]:
         """
@@ -56,7 +42,7 @@ class ProjectService:
                     continue
 
                 # Decode project path
-                project_path = self._decode_project_path(project_dir.name)
+                project_path = decode_project_path(project_dir.name)
 
                 # Count session files
                 session_files = list(project_dir.glob("*.jsonl"))

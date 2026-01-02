@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 
 from app.services.project_service import ProjectService
+from app.utils.path_utils import decode_project_path
 
 
 class TestProjectService:
@@ -13,16 +14,14 @@ class TestProjectService:
 
     def test_decode_project_path(self):
         """Test decoding project path from folder name."""
-        service = ProjectService()
-
         # Test with leading hyphen
         assert (
-            service._decode_project_path("-Users-test-project")
+            decode_project_path("-Users-test-project")
             == "/Users/test/project"
         )
 
         # Test without leading hyphen
-        assert service._decode_project_path("home-user-code") == "/home/user/code"
+        assert decode_project_path("home-user-code") == "/home/user/code"
 
     def test_list_projects_empty(self, temp_claude_dir):
         """Test listing projects when none exist."""
