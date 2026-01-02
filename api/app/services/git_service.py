@@ -1,6 +1,7 @@
 """
 Git provider OAuth and connection management with database storage.
 """
+import asyncio
 import secrets
 import logging
 import re
@@ -77,6 +78,8 @@ class GitService:
         self._oauth_states: Dict[str, Dict[str, Any]] = {}
         self._settings = get_settings()
         self._encryption = get_encryption_service()
+        # Lock to prevent concurrent token refresh for the same connection
+        self._refresh_locks: Dict[str, asyncio.Lock] = {}
 
         logger.info("GitService initialized with database storage and encryption")
 
@@ -533,12 +536,34 @@ class GitService:
                 needs_refresh = now >= refresh_threshold
 
             if needs_refresh and db_connection.refresh_token_encrypted:
-                logger.info(f"Token for connection {connection_id} needs refresh, attempting refresh")
-                try:
-                    await self._refresh_token(session, db_connection)
-                except Exception as e:
-                    logger.error(f"Token refresh failed for connection {connection_id}: {e}")
-                    # Continue with existing token, might still work
+                # Get or create a lock for this connection to prevent concurrent refresh
+                if connection_id not in self._refresh_locks:
+                    self._refresh_locks[connection_id] = asyncio.Lock()
+                
+                async with self._refresh_locks[connection_id]:
+                    # Re-check if token still needs refresh after acquiring lock
+                    # (another request might have already refreshed it)
+                    await session.refresh(db_connection)
+                    if db_connection.token_expires_at:
+                        refresh_threshold = db_connection.token_expires_at - timedelta(
+                            minutes=TOKEN_REFRESH_BUFFER_MINUTES
+                        )
+                        needs_refresh = now >= refresh_threshold
+                    
+                    if needs_refresh:
+                        logger.info(f"Token for connection {connection_id} needs refresh, attempting refresh")
+                        try:
+                            await self._refresh_token(session, db_connection)
+                        except Exception as e:
+                            logger.error(
+                                f"Token refresh failed for connection {connection_id}: {e}",
+                                exc_info=True,
+                            )
+                            # Fail fast instead of continuing with a potentially expired token
+                            raise BadRequestException(
+                                "Failed to refresh access token for Git connection; "
+                                "please re-authenticate and try again."
+                            ) from e
 
             # Decrypt and return access token
             return self._encryption.decrypt(db_connection.access_token_encrypted)
@@ -549,9 +574,12 @@ class GitService:
         """
         Refresh an expired or soon-to-expire access token.
 
+        Updates the db_connection object with new tokens but does NOT commit.
+        The caller is responsible for committing the session.
+
         Args:
-            session: Database session
-            db_connection: Database connection object
+            session: Database session (caller must commit)
+            db_connection: Database connection object to update
 
         Raises:
             BadRequestException: If token refresh fails
@@ -619,7 +647,7 @@ class GitService:
 
             db_connection.last_used_at = datetime.now(timezone.utc)
 
-            await session.commit()
+            # Note: Session commit is handled by the caller's context manager
 
             logger.info(f"Successfully refreshed token for connection {db_connection.id}")
 
@@ -688,9 +716,10 @@ class GitService:
             except Exception as e:
                 logger.error(f"Connection status check failed for {connection_id}: {e}")
 
-            # Update last_used_at
-            db_connection.last_used_at = datetime.now(timezone.utc)
-            await session.commit()
+            # Update last_used_at only when connection is valid
+            if is_valid:
+                db_connection.last_used_at = datetime.now(timezone.utc)
+                await session.commit()
 
             return GitConnectionStatus(
                 connection_id=connection_id,

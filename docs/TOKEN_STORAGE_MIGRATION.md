@@ -23,7 +23,7 @@ This guide explains the migration from in-memory token storage to production-rea
 ### 1. **Encrypted Token Storage**
 All OAuth access and refresh tokens are encrypted before being stored in the database using Fernet symmetric encryption.
 
-- **Algorithm**: Fernet (AES-128 CBC + HMAC)
+- **Algorithm**: Fernet (AES-128 CBC with PKCS7 padding and HMAC-SHA256 authentication)
 - **Key Source**: `ENCRYPTION_KEY` environment variable
 - **Automatic**: Encrypt on write, decrypt on read
 
