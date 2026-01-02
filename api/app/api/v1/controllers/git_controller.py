@@ -2,10 +2,8 @@
 Git settings controller.
 """
 import logging
-from typing import Optional
 
 from app.models.git_models import (
-    GitProvider,
     GitConnection,
     GitConnectionStatus,
     OAuthInitiateRequest,
@@ -91,19 +89,15 @@ class GitController:
         """
         return self.git_service.get_connection(connection_id)
 
-    def delete_connection(self, connection_id: str) -> dict:
+    def delete_connection(self, connection_id: str) -> None:
         """
         Delete a git connection.
 
         Args:
             connection_id: Connection identifier
-
-        Returns:
-            Success message
         """
         self.git_service.delete_connection(connection_id)
         logger.info(f"Deleted git connection: {connection_id}")
-        return {"message": "Connection deleted successfully"}
 
     async def check_connection_status(
         self, connection_id: str

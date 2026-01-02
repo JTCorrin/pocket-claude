@@ -22,6 +22,13 @@
 		state: string;
 		instanceUrl?: string;
 	} | null>(null);
+	
+	// Modal states
+	let showDeleteConfirm = $state(false);
+	let connectionToDelete = $state<string | null>(null);
+	let showInstanceUrlInput = $state(false);
+	let instanceUrlProvider = $state<GitProvider | null>(null);
+	let instanceUrlValue = $state('');
 
 	const REDIRECT_URI = 'pocketclaude://oauth-callback';
 
@@ -120,8 +127,8 @@
 				instanceUrl
 			};
 
-			// Save to localStorage for persistence across app restarts
-			localStorage.setItem('oauth_state', JSON.stringify(oauthState));
+			// Save to sessionStorage so it is cleared when the session ends
+			sessionStorage.setItem('oauth_state', JSON.stringify(oauthState));
 
 			// Open authorization URL in browser
 			await Browser.open({
@@ -160,7 +167,7 @@
 			}
 
 			// Restore OAuth state
-			const storedState = localStorage.getItem('oauth_state');
+			const storedState = sessionStorage.getItem('oauth_state');
 			if (!storedState) {
 				throw new Error('No OAuth state found');
 			}
@@ -181,7 +188,7 @@
 			});
 
 			// Clear OAuth state
-			localStorage.removeItem('oauth_state');
+			sessionStorage.removeItem('oauth_state');
 			oauthState = null;
 
 			// Reload connections
@@ -196,17 +203,56 @@
 	}
 
 	async function deleteConnection(connectionId: string) {
-		if (!confirm('Are you sure you want to disconnect this git provider?')) {
-			return;
-		}
+		connectionToDelete = connectionId;
+		showDeleteConfirm = true;
+	}
+	
+	async function confirmDelete() {
+		if (!connectionToDelete) return;
 
 		try {
-			await apiClient.git.deleteConnection(connectionId);
+			await apiClient.git.deleteConnection(connectionToDelete);
 			await loadConnections();
+			successMessage = 'Connection deleted successfully';
+			setTimeout(() => {
+				successMessage = null;
+			}, 3000);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to delete connection';
 			console.error('Delete error:', err);
+		} finally {
+			showDeleteConfirm = false;
+			connectionToDelete = null;
 		}
+	}
+	
+	function cancelDelete() {
+		showDeleteConfirm = false;
+		connectionToDelete = null;
+	}
+	
+	function showInstanceUrlModal(provider: GitProvider) {
+		instanceUrlProvider = provider;
+		instanceUrlValue = provider === GitProvider.GITLAB ? 'https://gitlab.com' : '';
+		showInstanceUrlInput = true;
+	}
+	
+	async function submitInstanceUrl() {
+		if (!instanceUrlProvider || !instanceUrlValue.trim()) {
+			error = 'Instance URL is required';
+			return;
+		}
+		
+		showInstanceUrlInput = false;
+		await connectProvider(instanceUrlProvider, instanceUrlValue.trim());
+		instanceUrlProvider = null;
+		instanceUrlValue = '';
+	}
+	
+	function cancelInstanceUrl() {
+		showInstanceUrlInput = false;
+		instanceUrlProvider = null;
+		instanceUrlValue = '';
 	}
 
 	function getProviderIcon(provider: GitProvider): string {
@@ -342,10 +388,7 @@
 
 				<button
 					class="provider-btn"
-					onclick={() => {
-						const url = prompt('Enter your GitLab instance URL:', 'https://gitlab.com');
-						if (url) connectProvider(GitProvider.GITLAB, url);
-					}}
+					onclick={() => showInstanceUrlModal(GitProvider.GITLAB)}
 					disabled={loading}
 				>
 					<span class="provider-icon">🦊</span>
@@ -354,10 +397,7 @@
 
 				<button
 					class="provider-btn"
-					onclick={() => {
-						const url = prompt('Enter your Gitea instance URL:');
-						if (url) connectProvider(GitProvider.GITEA, url);
-					}}
+					onclick={() => showInstanceUrlModal(GitProvider.GITEA)}
 					disabled={loading}
 				>
 					<span class="provider-icon">🍵</span>
@@ -373,6 +413,47 @@
 			</div>
 		{/if}
 	</section>
+	
+	<!-- Delete confirmation modal -->
+	{#if showDeleteConfirm}
+		<div class="modal-overlay" onclick={cancelDelete}>
+			<div class="modal" onclick={(e) => e.stopPropagation()}>
+				<h3>Confirm Deletion</h3>
+				<p>Are you sure you want to disconnect this git provider?</p>
+				<div class="modal-actions">
+					<button class="btn-secondary" onclick={cancelDelete}>Cancel</button>
+					<button class="btn-danger" onclick={confirmDelete}>Delete</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+	
+	<!-- Instance URL input modal -->
+	{#if showInstanceUrlInput}
+		<div class="modal-overlay" onclick={cancelInstanceUrl}>
+			<div class="modal" onclick={(e) => e.stopPropagation()}>
+				<h3>Enter Instance URL</h3>
+				<p>
+					{#if instanceUrlProvider === GitProvider.GITLAB}
+						Enter your GitLab instance URL (e.g., https://gitlab.com):
+					{:else if instanceUrlProvider === GitProvider.GITEA}
+						Enter your Gitea instance URL:
+					{/if}
+				</p>
+				<input
+					type="url"
+					bind:value={instanceUrlValue}
+					placeholder="https://example.com"
+					class="url-input"
+					onkeydown={(e) => e.key === 'Enter' && submitInstanceUrl()}
+				/>
+				<div class="modal-actions">
+					<button class="btn-secondary" onclick={cancelInstanceUrl}>Cancel</button>
+					<button class="btn-primary" onclick={submitInstanceUrl}>Connect</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -715,4 +796,77 @@
 			grid-template-columns: 1fr;
 		}
 	}
+
+	/* Modal styles */
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.5);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		padding: 1rem;
+	}
+
+	.modal {
+		background: white;
+		border-radius: 12px;
+		padding: 2rem;
+		max-width: 500px;
+		width: 100%;
+		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+	}
+
+	.modal h3 {
+		margin-bottom: 1rem;
+		font-size: 1.25rem;
+		font-weight: 600;
+	}
+
+	.modal p {
+		margin-bottom: 1.5rem;
+		color: #666;
+		line-height: 1.5;
+	}
+
+	.url-input {
+		width: 100%;
+		padding: 0.75rem;
+		border: 1px solid #e0e0e0;
+		border-radius: 6px;
+		font-size: 0.875rem;
+		margin-bottom: 1.5rem;
+		font-family: 'Monaco', 'Menlo', monospace;
+	}
+
+	.url-input:focus {
+		outline: none;
+		border-color: #007bff;
+		box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+	}
+
+	.modal-actions {
+		display: flex;
+		gap: 0.75rem;
+		justify-content: flex-end;
+	}
+
+	.btn-danger {
+		background: #dc3545;
+		color: white;
+		border: none;
+		padding: 0.5rem 1.5rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 500;
+	}
+
+	.btn-danger:hover {
+		background: #c82333;
+	}
+
 </style>

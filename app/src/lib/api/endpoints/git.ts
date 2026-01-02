@@ -25,7 +25,7 @@ export const OAuthInitiateRequestSchema = z.object({
 	instance_url: z.string().url().optional(),
 	code_challenge: z.string().min(43).max(128),
 	code_challenge_method: z.string().default('S256'),
-	redirect_uri: z.string().url()
+	redirect_uri: z.string().min(1) // Accept custom URL schemes like pocketclaude://
 });
 
 export type OAuthInitiateRequest = z.infer<typeof OAuthInitiateRequestSchema>;
@@ -48,7 +48,7 @@ export const OAuthCallbackRequestSchema = z.object({
 	code: z.string(),
 	state: z.string(),
 	code_verifier: z.string().min(43).max(128),
-	redirect_uri: z.string().url()
+	redirect_uri: z.string().min(1) // Accept custom URL schemes like pocketclaude://
 });
 
 export type OAuthCallbackRequest = z.infer<typeof OAuthCallbackRequestSchema>;
@@ -146,10 +146,6 @@ export function generatePKCE(): { codeVerifier: string; codeChallenge: string } 
 	const array = new Uint8Array(32);
 	crypto.getRandomValues(array);
 	const codeVerifier = base64URLEncode(array);
-
-	// Generate code challenge = BASE64URL(SHA256(codeVerifier))
-	const encoder = new TextEncoder();
-	const data = encoder.encode(codeVerifier);
 
 	// We'll compute SHA256 in the calling code since crypto.subtle is async
 	return {

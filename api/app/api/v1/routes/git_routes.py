@@ -101,13 +101,13 @@ async def get_connection(connection_id: str) -> GitConnection:
 
 @router.delete(
     "/connections/{connection_id}",
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete git connection",
     description="Remove a git provider connection. This revokes access and deletes stored credentials.",
 )
-async def delete_connection(connection_id: str) -> dict:
+async def delete_connection(connection_id: str) -> None:
     """Delete a git connection."""
-    return git_controller.delete_connection(connection_id)
+    git_controller.delete_connection(connection_id)
 
 
 @router.get(
