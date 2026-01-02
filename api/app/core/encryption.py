@@ -36,7 +36,12 @@ class EncryptionService:
             plaintext: The string to encrypt
 
         Returns:
-            Base64-encoded encrypted string
+            Base64-encoded encrypted string, or empty string if plaintext is empty
+
+        Note:
+            Empty strings are returned as-is without encryption. This is intentional
+            to allow for optional fields that may be null/empty. Callers should validate
+            that critical fields are non-empty before calling this method.
         """
         if not plaintext:
             return ""
@@ -52,10 +57,14 @@ class EncryptionService:
             ciphertext: The base64-encoded encrypted string
 
         Returns:
-            Decrypted plaintext string
+            Decrypted plaintext string, or empty string if ciphertext is empty
 
         Raises:
             cryptography.fernet.InvalidToken: If decryption fails
+
+        Note:
+            Empty strings are returned as-is without decryption. This matches the
+            behavior of the encrypt method for optional fields.
         """
         if not ciphertext:
             return ""

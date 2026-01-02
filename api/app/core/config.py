@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     GITEA_CLIENT_ID: str | None = None
 
     # Database
+    # NOTE: Default uses a relative path. For production, use an absolute path or
+    # ensure the application is always started from the project root directory.
     DATABASE_URL: str = "sqlite+aiosqlite:///./pocket_claude.db"
 
     # Encryption (required for token storage)

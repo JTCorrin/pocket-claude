@@ -35,7 +35,8 @@ def get_engine() -> AsyncEngine:
             echo=settings.DEBUG,  # Log SQL queries in debug mode
             pool_pre_ping=True,  # Verify connections before using
         )
-        logger.info(f"Created database engine for {settings.DATABASE_URL}")
+        # Log at DEBUG level only to avoid exposing credentials in production logs
+        logger.debug(f"Created database engine for {settings.DATABASE_URL}")
     return _engine
 
 
@@ -56,11 +57,16 @@ def get_session_maker() -> async_sessionmaker[AsyncSession]:
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Get a database session.
+    Get a database session with automatic commit on success.
+
+    The session automatically commits on successful completion and rolls back on error.
+    For explicit transaction control, pass the session as a parameter instead of 
+    using this context manager in nested calls.
 
     Usage:
         async with get_session() as session:
             result = await session.execute(query)
+            # session.commit() is called automatically on exit
     """
     session_maker = get_session_maker()
     async with session_maker() as session:
@@ -78,7 +84,19 @@ async def init_db() -> None:
 
     Creates all tables defined in Base.metadata.
     In production, use Alembic migrations instead.
+    
+    Raises:
+        RuntimeError: If called in production environment
     """
+    from app.core.config import get_settings
+    
+    settings = get_settings()
+    if settings.ENVIRONMENT == "production":
+        raise RuntimeError(
+            "Cannot use init_db() in production environment. "
+            "Use Alembic migrations instead: 'alembic upgrade head'"
+        )
+    
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
